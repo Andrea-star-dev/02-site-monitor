@@ -20,10 +20,25 @@
 3. **매너 있는 수집** — 대상 사이트의 `robots.txt`를 확인해서 수집이 금지된 경로는 건너뛰고,
    같은 사이트에 너무 자주 요청을 보내지 않도록 간격을 둡니다.
 
-> 결과 스크린샷 자리
->
-> - [ ] 콘솔에 변경 알림이 출력된 화면
-> - [ ] 텔레그램으로 온 알림 메시지 화면
+### 실행 예시
+
+아래는 `books.toscrape.com`의 책 가격이 바뀐 것으로 감지됐을 때의 실제 실행 결과입니다
+(테스트를 위해 DB 값을 임의로 바꿔서 변경을 재현했습니다):
+
+```
+$ ./monitor --targets config/targets.yaml --db data/site_monitor.db
+감시 대상 2개 점검 시작 (DB: data/site_monitor.db)
+[toscrape-book-light-in-attic-price] 변경 감지
+이전: £58.99
+현재: £51.77
+https://books.toscrape.com/catalogue/a-light-in-the-attic_1000/index.html
+  [toscrape-book-light-in-attic-price] 변경됨: £58.99 -> £51.77
+  [toscrape-book-soumission-price] 변경 없음 (£50.10)
+```
+
+텔레그램 설정을 켜면(`TELEGRAM_BOT_TOKEN`/`TELEGRAM_CHAT_ID`) 터미널에 찍히는 것과
+**똑같은 메시지**가 터미널 대신 텔레그램 채팅방으로 전송됩니다 — 알림 내용 자체는
+채널만 바뀔 뿐 동일합니다.
 
 ## 감시 대상 설정
 
