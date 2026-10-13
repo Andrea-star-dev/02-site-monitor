@@ -4,6 +4,8 @@ package store
 import (
 	"database/sql"
 	"fmt"
+	"os"
+	"path/filepath"
 	"time"
 
 	_ "modernc.org/sqlite"
@@ -35,7 +37,16 @@ type Store struct {
 
 // Open은 path의 SQLite 파일을 열고(없으면 생성) 스키마를 적용한다.
 // path에 ":memory:"를 주면 테스트용 인메모리 DB로 동작한다.
+// path의 상위 디렉토리가 없으면 만든다 (예: "data/site_monitor.db" → "data/").
 func Open(path string) (*Store, error) {
+	if path != ":memory:" {
+		if dir := filepath.Dir(path); dir != "." {
+			if err := os.MkdirAll(dir, 0o755); err != nil {
+				return nil, fmt.Errorf("DB 폴더 생성 실패 (%s): %w", dir, err)
+			}
+		}
+	}
+
 	db, err := sql.Open("sqlite", path)
 	if err != nil {
 		return nil, fmt.Errorf("sqlite 연결 실패 (%s): %w", path, err)

@@ -1,6 +1,7 @@
 package store
 
 import (
+	"path/filepath"
 	"testing"
 	"time"
 )
@@ -13,6 +14,20 @@ func openTestStore(t *testing.T) *Store {
 	}
 	t.Cleanup(func() { s.Close() })
 	return s
+}
+
+func TestOpenCreatesMissingParentDirectory(t *testing.T) {
+	dbPath := filepath.Join(t.TempDir(), "nested", "dir", "site_monitor.db")
+
+	s, err := Open(dbPath)
+	if err != nil {
+		t.Fatalf("Open() 실패 (상위 폴더가 없을 때): %v", err)
+	}
+	defer s.Close()
+
+	if err := s.SetState("book-a", "£51.77", time.Now()); err != nil {
+		t.Fatalf("SetState() 실패: %v", err)
+	}
 }
 
 func TestGetStateReturnsNilWhenNeverChecked(t *testing.T) {
