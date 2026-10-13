@@ -1,5 +1,7 @@
 # 웹페이지 가격/게시글 변경 감지 알리미
 
+[![CI](https://github.com/Junoh-Lee111/02-site-monitor/actions/workflows/ci.yml/badge.svg)](https://github.com/Junoh-Lee111/02-site-monitor/actions/workflows/ci.yml)
+
 지정한 웹페이지의 특정 부분(가격, 공고 제목 등)을 주기적으로 확인하고,
 값이 바뀌면 텔레그램으로 알려주는 도구입니다.
 
