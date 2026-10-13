@@ -4,10 +4,13 @@ package notifier
 import (
 	"context"
 	"fmt"
+	"html"
 	"io"
 	"net/http"
 	"net/url"
 	"strings"
+
+	"site-monitor/internal/style"
 )
 
 // Notifier는 메시지 하나를 보낸다.
@@ -15,20 +18,42 @@ type Notifier interface {
 	Notify(ctx context.Context, message string) error
 }
 
-// ConsoleNotifier는 메시지를 out에 그대로 출력한다 (텔레그램 설정이 없을 때 폴백).
+// ConsoleNotifier는 메시지를 out에 출력한다 (텔레그램 설정이 없을 때 폴백).
+// 실제 터미널에 출력할 때는 첫 줄을 굵은 인디고로, 나머지는 옅게 강조한다.
 type ConsoleNotifier struct {
-	out io.Writer
+	out   io.Writer
+	style *style.Styler
 }
 
 // NewConsole은 ConsoleNotifier를 만든다.
 func NewConsole(out io.Writer) *ConsoleNotifier {
-	return &ConsoleNotifier{out: out}
+	return &ConsoleNotifier{out: out, style: style.New(out)}
 }
 
-// Notify는 message를 그대로 한 줄 출력한다.
+// Notify는 message를 출력한다 (첫 줄 강조, 나머지는 옅게).
 func (c *ConsoleNotifier) Notify(_ context.Context, message string) error {
-	_, err := fmt.Fprintln(c.out, message)
+	lines := strings.SplitN(message, "\n", 2)
+	first := c.style.Bold(c.style.Indigo(lines[0]))
+
+	if len(lines) == 1 {
+		_, err := fmt.Fprintln(c.out, first)
+		return err
+	}
+
+	rest := c.style.Dim(lines[1])
+	_, err := fmt.Fprintln(c.out, first+"\n"+rest)
 	return err
+}
+
+// formatTelegramHTML은 메시지 첫 줄을 굵게 표시하고 전체를 텔레그램 HTML
+// parse_mode 기준으로 이스케이프한다 (<, >, & 가 포함된 URL이나 값이 있어도 안전).
+func formatTelegramHTML(message string) string {
+	lines := strings.SplitN(message, "\n", 2)
+	first := "<b>" + html.EscapeString(lines[0]) + "</b>"
+	if len(lines) == 1 {
+		return first
+	}
+	return first + "\n" + html.EscapeString(lines[1])
 }
 
 const telegramAPIBase = "https://api.telegram.org"
@@ -46,13 +71,15 @@ func NewTelegram(client *http.Client, token, chatID string) *TelegramNotifier {
 	return &TelegramNotifier{client: client, token: token, chatID: chatID, apiBase: telegramAPIBase}
 }
 
-// Notify는 텔레그램 sendMessage API를 호출한다.
+// Notify는 텔레그램 sendMessage API를 호출한다. 메시지 첫 줄(대상 이름 + 상태)을
+// 굵게 표시해 콘솔 출력과 같은 느낌을 낸다 (HTML parse_mode).
 func (t *TelegramNotifier) Notify(ctx context.Context, message string) error {
 	apiURL := fmt.Sprintf("%s/bot%s/sendMessage", t.apiBase, t.token)
 
 	form := url.Values{
-		"chat_id": {t.chatID},
-		"text":    {message},
+		"chat_id":    {t.chatID},
+		"text":       {formatTelegramHTML(message)},
+		"parse_mode": {"HTML"},
 	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, apiURL, strings.NewReader(form.Encode()))

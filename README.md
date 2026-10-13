@@ -36,9 +36,10 @@ https://books.toscrape.com/catalogue/a-light-in-the-attic_1000/index.html
   [toscrape-book-soumission-price] 변경 없음 (£50.10)
 ```
 
-텔레그램 설정을 켜면(`TELEGRAM_BOT_TOKEN`/`TELEGRAM_CHAT_ID`) 터미널에 찍히는 것과
-**똑같은 메시지**가 터미널 대신 텔레그램 채팅방으로 전송됩니다 — 알림 내용 자체는
-채널만 바뀔 뿐 동일합니다.
+텔레그램 설정을 켜면(`TELEGRAM_BOT_TOKEN`/`TELEGRAM_CHAT_ID`) 같은 내용이 터미널
+대신 텔레그램 채팅방으로 전송됩니다 (첫 줄은 굵게 표시됩니다). 실제 터미널에서
+실행하면 대상 이름은 인디고, "변경됨"은 골드로 강조되어 출력됩니다 — 파이프로
+연결하거나 `NO_COLOR` 환경변수를 설정하면 색 없이 일반 텍스트로만 출력됩니다.
 
 ## 감시 대상 설정
 

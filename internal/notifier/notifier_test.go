@@ -22,9 +22,25 @@ func TestConsoleNotifierWritesMessage(t *testing.T) {
 	}
 }
 
+func TestConsoleNotifierWritesMultiLineMessage(t *testing.T) {
+	var buf bytes.Buffer
+	c := NewConsole(&buf)
+
+	message := "[book-a] 변경 감지\n이전: £51.77\n현재: £45.00"
+	if err := c.Notify(context.Background(), message); err != nil {
+		t.Fatalf("Notify() 에러: %v", err)
+	}
+	// bytes.Buffer는 터미널이 아니므로 색 코드 없이 그대로 출력돼야 한다.
+	if got := buf.String(); got != message+"\n" {
+		t.Errorf("출력 = %q, want %q", got, message+"\n")
+	}
+}
+
 func TestTelegramNotifierSendsExpectedRequest(t *testing.T) {
 	var capturedPath string
 	var capturedChatID, capturedText string
+
+	var capturedParseMode string
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		capturedPath = r.URL.Path
@@ -32,6 +48,7 @@ func TestTelegramNotifierSendsExpectedRequest(t *testing.T) {
 		values, _ := url.ParseQuery(body)
 		capturedChatID = values.Get("chat_id")
 		capturedText = values.Get("text")
+		capturedParseMode = values.Get("parse_mode")
 		w.WriteHeader(http.StatusOK)
 	}))
 	defer srv.Close()
@@ -49,8 +66,37 @@ func TestTelegramNotifierSendsExpectedRequest(t *testing.T) {
 	if capturedChatID != "12345" {
 		t.Errorf("chat_id = %q, want 12345", capturedChatID)
 	}
-	if capturedText != "가격 변경: £51.77 -> £45.00" {
+	if capturedParseMode != "HTML" {
+		t.Errorf("parse_mode = %q, want HTML", capturedParseMode)
+	}
+	// 첫 줄(유일한 줄)은 굵게 표시된다.
+	if capturedText != "<b>가격 변경: £51.77 -&gt; £45.00</b>" {
 		t.Errorf("text = %q", capturedText)
+	}
+}
+
+func TestTelegramNotifierBoldsOnlyFirstLine(t *testing.T) {
+	var capturedText string
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := readBody(r)
+		values, _ := url.ParseQuery(body)
+		capturedText = values.Get("text")
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	n := NewTelegram(srv.Client(), "fake-token", "12345")
+	n.apiBase = srv.URL
+
+	message := "[book-a] 변경 감지\n이전: £51.77\n현재: £45.00"
+	if err := n.Notify(context.Background(), message); err != nil {
+		t.Fatalf("Notify() 에러: %v", err)
+	}
+
+	want := "<b>[book-a] 변경 감지</b>\n이전: £51.77\n현재: £45.00"
+	if capturedText != want {
+		t.Errorf("text = %q, want %q", capturedText, want)
 	}
 }
 

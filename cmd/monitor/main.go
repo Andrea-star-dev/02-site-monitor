@@ -19,6 +19,7 @@ import (
 	"site-monitor/internal/notifier"
 	"site-monitor/internal/scraper"
 	"site-monitor/internal/store"
+	"site-monitor/internal/style"
 )
 
 func main() {
@@ -59,18 +60,22 @@ func run(targetsPath, dbPath string, minInterval time.Duration) error {
 
 	results := runner.CheckAll(context.Background(), cfg.Targets)
 
+	out := style.New(os.Stdout)
+	errOut := style.New(os.Stderr)
+
 	hadError := false
 	for _, r := range results {
+		name := out.Indigo(r.Target.Name)
 		switch {
 		case r.Err != nil:
 			hadError = true
-			fmt.Fprintf(os.Stderr, "  [%s] 실패: %v\n", r.Target.Name, r.Err)
+			fmt.Fprintf(os.Stderr, "  [%s] %s: %v\n", errOut.Indigo(r.Target.Name), errOut.Red("실패"), r.Err)
 		case r.Changed:
-			fmt.Printf("  [%s] 변경됨: %s -> %s\n", r.Target.Name, r.OldValue, r.NewValue)
+			fmt.Printf("  [%s] %s: %s -> %s\n", name, out.Bold(out.Gold("변경됨")), r.OldValue, r.NewValue)
 		case r.IsFirst:
-			fmt.Printf("  [%s] 최초 등록: %s\n", r.Target.Name, r.NewValue)
+			fmt.Printf("  [%s] %s: %s\n", name, out.Dim("최초 등록"), r.NewValue)
 		default:
-			fmt.Printf("  [%s] 변경 없음 (%s)\n", r.Target.Name, r.NewValue)
+			fmt.Printf("  [%s] %s (%s)\n", name, out.Dim("변경 없음"), r.NewValue)
 		}
 	}
 
