@@ -9,7 +9,7 @@ COPY . .
 RUN CGO_ENABLED=0 GOOS=linux go build -o /out/monitor ./cmd/monitor
 
 FROM alpine:3.20
-RUN addgroup -S monitor && adduser -S -G monitor monitor \
+RUN addgroup -g 10001 monitor && adduser -D -u 10001 -G monitor monitor \
     && mkdir -p /app/config /app/data \
     && chown -R monitor:monitor /app
 
