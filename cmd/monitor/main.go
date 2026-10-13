@@ -1,38 +1,81 @@
 // site-monitor는 지정한 웹페이지의 가격/게시글 변화를 감지해 알린다.
 //
-// 현재(Day 1)는 설정 파일을 읽고 DB를 초기화하는 뼈대만 동작한다.
-// 실제 스크래핑/알림 로직은 이후 단계에서 추가된다.
+// 설정 파일(targets.yaml)에 있는 모든 대상을 한 번 점검하고, 이전 값과
+// 다르면 텔레그램으로 알린다 (TELEGRAM_BOT_TOKEN/TELEGRAM_CHAT_ID가 없으면
+// 콘솔에 출력). 주기적으로 실행하려면 cron이나 systemd timer, 또는 Docker의
+// 재시작 정책과 함께 사용한다.
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
+	"net/http"
 	"os"
+	"time"
 
 	"site-monitor/internal/config"
+	"site-monitor/internal/monitor"
+	"site-monitor/internal/notifier"
+	"site-monitor/internal/scraper"
 	"site-monitor/internal/store"
 )
 
 func main() {
 	targetsPath := flag.String("targets", "config/targets.yaml", "감시 대상 YAML 경로")
 	dbPath := flag.String("db", "site_monitor.db", "SQLite DB 파일 경로")
+	minInterval := flag.Duration("min-interval", 3*time.Second, "같은 호스트에 대한 최소 요청 간격")
 	flag.Parse()
 
-	cfg, err := config.Load(*targetsPath)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "설정 로드 실패: %v\n", err)
+	if err := run(*targetsPath, *dbPath, *minInterval); err != nil {
+		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
+}
 
-	db, err := store.Open(*dbPath)
+func run(targetsPath, dbPath string, minInterval time.Duration) error {
+	cfg, err := config.Load(targetsPath)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "DB 열기 실패: %v\n", err)
-		os.Exit(1)
+		return fmt.Errorf("설정 로드 실패: %w", err)
+	}
+
+	db, err := store.Open(dbPath)
+	if err != nil {
+		return fmt.Errorf("DB 열기 실패: %w", err)
 	}
 	defer db.Close()
 
-	fmt.Printf("감시 대상 %d개를 불러왔습니다 (DB: %s)\n", len(cfg.Targets), *dbPath)
-	for _, t := range cfg.Targets {
-		fmt.Printf("  - %s (%s, 주기 %s)\n", t.Name, t.URL, t.CheckInterval)
+	notify := notifier.Resolve(
+		&http.Client{Timeout: 10 * time.Second},
+		os.Getenv("TELEGRAM_BOT_TOKEN"),
+		os.Getenv("TELEGRAM_CHAT_ID"),
+		os.Stdout,
+	)
+
+	s := scraper.New(minInterval)
+	runner := monitor.New(s, db, notify)
+
+	fmt.Printf("감시 대상 %d개 점검 시작 (DB: %s)\n", len(cfg.Targets), dbPath)
+
+	results := runner.CheckAll(context.Background(), cfg.Targets)
+
+	hadError := false
+	for _, r := range results {
+		switch {
+		case r.Err != nil:
+			hadError = true
+			fmt.Fprintf(os.Stderr, "  [%s] 실패: %v\n", r.Target.Name, r.Err)
+		case r.Changed:
+			fmt.Printf("  [%s] 변경됨: %s -> %s\n", r.Target.Name, r.OldValue, r.NewValue)
+		case r.IsFirst:
+			fmt.Printf("  [%s] 최초 등록: %s\n", r.Target.Name, r.NewValue)
+		default:
+			fmt.Printf("  [%s] 변경 없음 (%s)\n", r.Target.Name, r.NewValue)
+		}
 	}
+
+	if hadError {
+		return fmt.Errorf("일부 대상 점검에 실패했습니다")
+	}
+	return nil
 }
