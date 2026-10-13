@@ -1,0 +1,5 @@
+/monitor
+*.db
+*.db-journal
+.DS_Store
+config/targets.yaml

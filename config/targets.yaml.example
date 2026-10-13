@@ -1,0 +1,17 @@
+# 감시할 대상 목록. 이 파일을 config/targets.yaml로 복사해서 사용하세요.
+#
+# name:           이 대상을 구분하는 이름 (알림 메시지에 표시됨)
+# url:            감시할 페이지 주소
+# selector:       값을 추출할 CSS 셀렉터 (가격, 제목 등 하나의 텍스트를 가리켜야 함)
+# check_interval: 확인 주기 (Go duration 문법: "30m", "1h", "2h30m" 등)
+
+targets:
+  - name: "toscrape-book-light-in-attic-price"
+    url: "https://books.toscrape.com/catalogue/a-light-in-the-attic_1000/index.html"
+    selector: "p.price_color"
+    check_interval: "30m"
+
+  - name: "toscrape-book-soumission-price"
+    url: "https://books.toscrape.com/catalogue/soumission_998/index.html"
+    selector: "p.price_color"
+    check_interval: "1h"
